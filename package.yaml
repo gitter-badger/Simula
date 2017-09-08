@@ -49,8 +49,7 @@ dependencies:
   - StateVar
   - simula-wayland
   - simula-osvr
-
-
+  - simula-openvr
 
 _executable_options: &executable_options
   dependencies: [base, SimulaHS]
