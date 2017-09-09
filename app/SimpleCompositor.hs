@@ -1,5 +1,6 @@
 import Control.Exception
 import Control.Lens
+import Control.Monad
 import Control.Concurrent.MVar
 import Data.Typeable
 
@@ -20,6 +21,8 @@ import DBus
 import DBus.Client
 
 import Graphics.Rendering.OpenGL hiding (translate, scale, rotate)
+
+import OpenVR
 
 pingFunc :: MethodCall -> IO Reply
 pingFunc _ = return $ replyReturn []
@@ -58,23 +61,38 @@ cleanupDbus dbus = do
 
 mainBody :: Client -> IO ()
 mainBody dbus = do
-  seat <- newSimulaSeat
-  let dpRot = axisAngle (V3 1 0 0) (radians (negate 25))
-  let dpTf = translate (V3 0 0.8 1.25) !*! m33_to_m44 (fromQuaternion dpRot)
-  rec -- order is important
-    comp <- newSimulaCompositor scene disp
-    Just glctx <- readMVar (comp ^. simulaCompositorGlContext)
-    scene <- Scene <$> newBaseNode scene Nothing identity
-           <*> newMVar 0 <*> newMVar 0
-           <*> pure wm <*> newMVar (Some comp) <*> newMVar [] <*> newMVar Nothing
-    disp <- newDisplay glctx (V2 1280 720) (V2 0.325 0.1) scene dpTf
-    vp <- newViewPoint 0.01 100 disp disp (translate (V3 0 0 0.1)) (V4 0 0 1 1) (V3 0 0 0)
-    modifyMVar' (disp ^. displayViewpoints) (vp:)
-    modifyMVar' (scene ^. sceneDisplays) (disp:)
+    seat <- newSimulaSeat
+    -- is OpenVR installed and working?
+    runStatus <- vrIsRuntimeInstalled
+    unless runStatus (ioError $ userError "Cannot find the OpenVR Runtime")
+    
+    -- Do we have a headset?
+    hmdStatus <- vrIsHmdPresent
+    when hmdStatus $ putStrLn "OpenVR thinks there is a headset"
+    unless hmdStatus $ putStrLn "OpenVR thinks there is NOT a headset"
 
-    wm <- newWindowManager scene seat
-  startCompositor comp
+    -- If we made it this far, then we should initialize OpenVR and set up
+    -- the controllers, then check for the headset again.
+    setupAndStartCompositor seat
+  where
+    setupAndStartCompositor seat = do
+      let dpRot = axisAngle (V3 1 0 0) (radians (negate 25))
+      let dpTf = translate (V3 0 0.8 1.25) !*! m33_to_m44 (fromQuaternion dpRot)
 
+      rec -- order is important
+        comp <- newSimulaCompositor scene disp
+        Just glctx <- readMVar (comp ^. simulaCompositorGlContext)
+        scene <- Scene <$> newBaseNode scene Nothing identity
+                       <*> newMVar 0 <*> newMVar 0
+                       <*> pure wm <*> newMVar (Some comp)
+                       <*> newMVar [] <*> newMVar Nothing
+        disp <- newDisplay glctx (V2 1280 720) (V2 0.325 0.1) scene dpTf
+        vp <- newViewPoint 0.01 100 disp disp (translate (V3 0 0 0.1)) (V4 0 0 1 1) (V3 0 0 0)
+        modifyMVar' (disp ^. displayViewpoints) (vp:)
+        modifyMVar' (scene ^. sceneDisplays) (disp:)
+
+        wm <- newWindowManager scene seat
+      startCompositor comp
 
 main :: IO ()
 main = do

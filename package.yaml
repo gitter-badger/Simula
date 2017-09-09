@@ -83,3 +83,4 @@ executables:
     main: SimpleCompositor.hs
     source-dirs: app
     dependencies: [dbus, SimulaHS]
+    extra-libraries: [openvr_api]
