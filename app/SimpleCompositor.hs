@@ -73,9 +73,11 @@ mainBody dbus = do
 
     -- If we made it this far, then we should initialize OpenVR and set up
     -- the controllers, then check for the headset again.
-    setupAndStartCompositor seat
+    vrInitInternal nullPtr (fromIntegral $ fromEnum EvrapplicationtypeVrapplicationScene)
+      >>= setupAndStartCompositor seat
+    vrShutdownInternal
   where
-    setupAndStartCompositor seat = do
+    setupAndStartCompositor seat vrsys = do
       let dpRot = axisAngle (V3 1 0 0) (radians (negate 25))
       let dpTf = translate (V3 0 0.8 1.25) !*! m33_to_m44 (fromQuaternion dpRot)
 
