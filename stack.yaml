@@ -1,3 +1,4 @@
+resolver: lts-9.3
 # User packages to be built.
 # Various formats can be used as shown in the example below.
 #
